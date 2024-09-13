@@ -91,6 +91,7 @@ After running this, the script will prompt you to:
 - Specify the **OutFile** (output file path).
 - Enter the **Password** (used for encryption or decryption).
 
+
 ### Hash Verification during Decryption
 
 If the hash verification fails during decryption, the script will display both the expected (stored) hash and the computed hash, like this:
