@@ -2,83 +2,98 @@
 
 ## Overview
 
-The **File Cryptor** is a PowerShell script designed to securely encrypt and decrypt files using the Advanced Encryption Standard (AES). It leverages password-based encryption instead of key files, making it simpler to manage. The script supports large files, ensures file integrity through hashing, and offers customizable file paths.
+The **File Cryptor** is a versatile PowerShell script designed to securely encrypt and decrypt files using AES encryption. By employing password-based encryption, it simplifies the process without the need to manage separate key files. The script ensures data integrity by generating and verifying file hashes, supports large file sizes, and provides flexible output file handling.
 
 ## Features
 
-- **AES Encryption/Decryption**: Secure your files using AES 256-bit encryption.
-- **Password-Based Encryption**: Users provide a password during encryption, removing the need for managing separate key files.
-- **File Integrity Check**: Ensures that files are not tampered with by generating and verifying a SHA-256 hash during the encryption and decryption processes.
-- **Large File Support**: Efficiently handles large files by processing them in chunks, avoiding memory issues.
-- **Customizable Output**: Flexible file naming with dynamic options like including the system hostname in file names.
-- **Error Handling & Resource Management**: The script properly handles errors and ensures resources like file streams and cryptographic objects are disposed of correctly.
-- **Overwrite Protection**: Prompts the user before overwriting existing files to prevent accidental data loss.
+- **AES Encryption/Decryption**: Uses AES 256-bit encryption for strong security.
+- **Password-Based Encryption**: Derives the encryption key from a user-provided password, eliminating the need for key files.
+- **File Integrity Check**: Generates a SHA-256 hash during encryption and validates it during decryption to ensure the file has not been tampered with.
+- **Efficient Large File Handling**: Processes large files in chunks, minimizing memory usage.
+- **Customizable File Paths**: Use dynamic options like including the system hostname in output file paths.
+- **Resource Management & Error Handling**: Cleans up cryptographic resources and provides robust error handling.
+- **Overwrite Protection**: Prompts before overwriting existing files to avoid accidental data loss.
 
 ## Requirements
 
-- **PowerShell**: Ensure that you have PowerShell 5.0 or later installed.
-- **.NET Framework**: .NET Framework 4.5 or higher is required for cryptographic functions.
+- **PowerShell**: PowerShell version 5.0 or later.
+- **.NET Framework**: Requires .NET Framework 4.5 or higher for cryptographic functions.
 
 ## Installation
 
-1. Download the script file `FileCryptor.ps1`.
-2. Place the script in a directory where you will be running it from.
-3. Ensure that the execution policy allows for running PowerShell scripts:
+1. Download the `FileCryptor.ps1` script.
+2. Place the script in a desired directory.
+3. Ensure that the execution policy permits running scripts:
 
-   ```Powershell
+   ```powershell
    Powershell -ExecutionPolicy Bypass -File "C:\path\to\FileCryptor.ps1"
    ```
 
 ## Usage
 
-The script offers two modes of operation: **Encryption** and **Decryption**. It uses command-line arguments for specifying input files, passwords, and other options.
+The script supports two main modes: **Encryption** and **Decryption**. Command-line arguments are used to specify file paths, passwords, and other options.
 
-### Encryption
+### Encrypting a File
 
-To encrypt a file:
+To encrypt a file, use the following command:
 
 ```powershell
-.\FileCryptor.ps1 -Mode Encrypt -InFile "C:\path\to\inputfile.txt" -OutFile "C:\path\to\encryptedfile.txt.enc" -Password "YourStrongPassword" -HashFile "C:\path\to\file.hash"
+.\FileCryptor.ps1 -Mode Encrypt -InFile "C:\path\to\inputfile.txt" -OutFile "C:\path\to\encryptedfile.txt.enc" -Password "YourStrongPassword"
 ```
 
-- `-Mode Encrypt`: Specifies that the script should encrypt the file.
-- `-InFile`: Path to the file that needs to be encrypted.
+- `-Mode Encrypt`: Indicates that the script should perform encryption.
+- `-InFile`: Path to the file to be encrypted.
 - `-OutFile`: Path where the encrypted file will be saved.
-- `-Password`: The password used to derive the encryption key.
--  `-HashFile`: (Optional) Path to save the `.hash` file used to verify file integrity.
+- `-Password`: User-defined password to derive the encryption key.
+- `-HashFile` (optional): Path to store the SHA-256 hash of the original file for integrity verification.
 
-### Decryption
+### Decrypting a File
 
-To decrypt a file:
+To decrypt an encrypted file, run:
 
 ```powershell
 .\FileCryptor.ps1 -Mode Decrypt -InFile "C:\path\to\encryptedfile.txt.enc" -OutFile "C:\path\to\decryptedfile.txt" -Password "YourStrongPassword" -HashFile "C:\path\to\file.hash"
 ```
 
-- `-Mode Decrypt`: Specifies that the script should decrypt the file.
+- `-Mode Decrypt`: Indicates that the script should perform decryption.
 - `-InFile`: Path to the encrypted file.
 - `-OutFile`: Path where the decrypted file will be saved.
-- `-Password`: The same password used during encryption.
-- `-HashFile`: (Optional) Path to the `.hash` file used to verify file integrity.
+- `-Password`: The same password used for encryption.
+- `-HashFile`: Path to the stored SHA-256 hash for integrity verification.
 
-### Example of Full Command
+### Full Command Example
 
-Encryption:
+Encrypt a file:
 ```powershell
-.\FileCryptor.ps1 -Mode Encrypt -InFile "C:\Documents\report.docx" -OutFile "C:\Documents\report.docx.enc" -Password "StrongPassword123" 
+.\FileCryptor.ps1 -Mode Encrypt -InFile "C:\Documents\report.docx" -OutFile "C:\Documents\report.docx.enc" -Password "StrongPassword123"
 ```
 
-Decryption:
+Decrypt a file:
 ```powershell
 .\FileCryptor.ps1 -Mode Decrypt -InFile "C:\Documents\report.docx.enc" -OutFile "C:\Documents\report_decrypted.docx" -Password "StrongPassword123" -HashFile "C:\Documents\report.hash"
 ```
 
-## Parameters
+### Hash Verification during Decryption
 
-| Parameter  | Description                                                                                                  |
-|------------|--------------------------------------------------------------------------------------------------------------|
-| `-Mode`    | **Encrypt** or **Decrypt**. Defines whether the script will encrypt or decrypt the file.                     |
-| `-InFile`  | Path to the input file that will be encrypted or decrypted.                                                   |
-| `-OutFile` | Path where the encrypted or decrypted file will be saved.                                                    |
-| `-Password`| The password used for both encryption and decryption.                                                        |                        
-| `-HashFile`| (Optional) Path to save or verify the SHA-256 hash for file integrity.                                        |
+If the hash verification fails during decryption, the script will display both the expected hash (stored hash) and the computed hash, like this:
+
+```
+HASH VERIFICATION FAILED. File integrity check failed.
+Expected Hash (Stored): e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+Computed Hash (Found):  d3f1e74229ab7a60f8df01b93e53e7a839c129b282b1c5b2d43d6a16282d1e98
+```
+
+### Parameters
+
+| Parameter   | Description                                                                                                  |
+|-------------|--------------------------------------------------------------------------------------------------------------|
+| `-Mode`     | **Encrypt** or **Decrypt**: Defines whether the script encrypts or decrypts the file.                        |
+| `-InFile`   | Path to the input file to be encrypted or decrypted.                                                         |
+| `-OutFile`  | Path where the encrypted or decrypted file will be saved.                                                    |
+| `-Password` | Password used for both encryption and decryption (password-based encryption).                                |
+| `-KeySize`  | (Optional) Specifies key size for encryption: 128, 192, or 256 bits (default is 256).                        |
+| `-HashFile` | (Optional) Path to save or verify the SHA-256 hash for file integrity.                                        |
+
+## Notes
+
+- **File Naming**: During encryption, the hash file will be saved with the original file's extension, e.g., `file.txt.hash`.
