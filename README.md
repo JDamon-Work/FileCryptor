@@ -91,7 +91,6 @@ Computed Hash (Found):  d3f1e74229ab7a60f8df01b93e53e7a839c129b282b1c5b2d43d6a16
 | `-InFile`   | Path to the input file to be encrypted or decrypted.                                                         |
 | `-OutFile`  | Path where the encrypted or decrypted file will be saved.                                                    |
 | `-Password` | Password used for both encryption and decryption (password-based encryption).                                |
-| `-KeySize`  | (Optional) Specifies key size for encryption: 128, 192, or 256 bits (default is 256).                        |
 | `-HashFile` | (Optional) Path to save or verify the SHA-256 hash for file integrity.                                        |
 
 ## Notes
