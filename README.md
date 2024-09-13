@@ -27,6 +27,7 @@ The **File Cryptor** is a PowerShell script designed to securely encrypt and dec
 1. Download the script file `FileCryptor.ps1`.
 2. Place the script in a directory where you will be running it from.
 3. Ensure that the execution policy allows for running PowerShell scripts:
+
    ```Powershell
    Powershell -ExecutionPolicy Bypass -File "C:\path\to\FileCryptor.ps1"
    ```
