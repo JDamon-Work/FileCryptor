@@ -89,3 +89,4 @@ Decryption:
 3. **File Integrity**: Ensures that decrypted files match the original by comparing SHA-256 hashes.
 4. **Customizable File Naming**: Allows dynamic output file names with placeholders like `[hn]` for the hostname.
 5. **Supports Large Files**: Processes files in chunks, making it suitable for encrypting or decrypting large files without memory issues.
+6. **Overwrite Protection**: Prompts the user before overwriting existing files to prevent accidental data loss.
