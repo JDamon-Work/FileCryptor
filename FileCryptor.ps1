@@ -36,26 +36,25 @@
 
 function Show-Help {
     Write-Host @"
-Usage: .\FileCryptor.ps1 -Mode <Encrypt|Decrypt> -InFile <InputFilePath> -OutFile <OutputFilePath> -Password <Password> [-KeySize <KeySize>] [-HashFile <HashFilePath>] [-h]
+Usage: .\FileCryptor.ps1 -Mode <Encrypt|Decrypt> -InFile <InputFilePath> -OutFile <OutputFilePath> -Password <Password> [-HashFile <HashFilePath>] [-h]
 
 Parameters:
     -Mode         : Specifies whether to 'Encrypt' or 'Decrypt' the file.
     -InFile       : Path to the input file (file to encrypt or AES-encrypted file to decrypt).
     -OutFile      : Path to save the encrypted or decrypted file. You can use '[hn]' or '[hostname]' in the file path, which will be replaced by the system's hostname.
     -Password     : Password used to derive the encryption/decryption key (PBKDF2).
-    -KeySize      : (Optional for encryption) Key size for encryption (128, 192, 256). Default is 256.
     -HashFile     : (Optional) Path to save the SHA-256 hash of the original file (for encryption) or to validate integrity (for decryption).
     -h, -help     : Show this help menu.
 
 Examples:
     Encrypt a file with default settings:
-        .\FileCryptor.ps1 -Mode Encrypt -InFile "C:\path\to\file.txt" -OutFile "C:\path\to\file.txt.enc" -Password "YourPassword"
+        .\FileCryptor.ps1 -Mode Encrypt -InFile "C:\path\to\file.txt" -OutFile "C:\path\to\file.txt.enc" -Password "YourStrongPassword"
 
     Decrypt a file:
-        .\FileCryptor.ps1 -Mode Decrypt -InFile "C:\path\to\file.enc" -OutFile "C:\path\to\output.docx" -Password "YourPassword"
+        .\FileCryptor.ps1 -Mode Decrypt -InFile "C:\path\to\file.txt.enc" -OutFile "C:\path\to\output.docx" -Password "YourStrongPassword"
 
     Use hostname in output path:
-        .\FileCryptor.ps1 -Mode Encrypt -InFile "C:\path\to\file.txt" -OutFile "C:\path\to\[hostname]\file.txt.enc" -Password "YourPassword"
+        .\FileCryptor.ps1 -Mode Encrypt -InFile "C:\path\to\file.txt" -OutFile "C:\path\to\[hostname]\file.txt.enc" -Password "YourStrongPassword"
 "@
 }
 
@@ -136,30 +135,20 @@ function Get-Hash {
         $sha256.TransformBlock($buffer, 0, $bytesRead, $buffer, 0) | Out-Null
     }
     $sha256.TransformFinalBlock($buffer, 0, 0) | Out-Null
-    $hashBytes = $sha256.Hash
-    $sha256.Dispose()
-    return $hashBytes
+    return $sha256.Hash
 }
 
+# Generates a hash file name in the same directory as OutFile, but using the original base file name
 function Get-DefaultHashFilePath {
     param (
         [string] $InFile,
         [string] $OutFile
     )
-    # Get the base name and original extension of the file
-    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($InFile)
-    $originalExtension = [System.IO.Path]::GetExtension($InFile)
-
-    # For decryption, we need to remove the `.aes` and use the original file extension
-    if ($Mode -eq 'Decrypt' -and $originalExtension -eq '.aes') {
-        # Remove `.aes` and get the original file's base name and extension
-        $baseName = [System.IO.Path]::GetFileNameWithoutExtension($baseName)
-        $originalExtension = [System.IO.Path]::GetExtension($OutFile)  # Use the original extension from the OutFile
-    }
-
-    # Save the hash file in the same directory as OutFile
-    $outputDirectory = [System.IO.Path]::GetDirectoryName($OutFile)
-    return [System.IO.Path]::Combine($outputDirectory, "$baseName$originalExtension.hash")
+    # Get the base name and the original extension of the InFile
+    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($InFile)  # Get base name without extension
+    $extension = [System.IO.Path]::GetExtension($InFile)  # Get original extension
+    $outputDirectory = [System.IO.Path]::GetDirectoryName($OutFile)     # Use directory of the OutFile
+    return [System.IO.Path]::Combine($outputDirectory, "$baseName$extension.hash")  # Add .hash suffix with original extension
 }
 
 ################################################################################
@@ -213,39 +202,51 @@ function Encrypt-File {
     $originalHashString = -join ($originalHash | ForEach-Object { $_.ToString('x2') })
     $inStream.Position = 0
 
-    Write-Host "Hash of the original file (SHA-256): $originalHashString"
-
-    # Save the hash to the specified file
+    # Ensure HashFile is set based on the original filename, but saved in the OutFile's directory
     if (-not $HashFile) {
         $HashFile = Get-DefaultHashFilePath -InFile $InFile -OutFile $OutFile
     }
-    Set-Content -Path $HashFile -Value $originalHashString
-    Write-Host "Hash saved to: $HashFile"
 
-    # Create encryption key and IV using password and salt
-    $salt = New-Object byte[] 32
-    [void](New-Object System.Security.Cryptography.RNGCryptoServiceProvider).GetBytes($salt)
-    $rfc2898 = New-Object System.Security.Cryptography.Rfc2898DeriveBytes($Password, $salt, 10000)
+    # Save original file's hash with overwrite protection
+    if (-not (Confirm-Overwrite -Path $HashFile)) {
+        return
+    }
+    [System.IO.File]::WriteAllText($HashFile, $originalHashString)
+
+    # Generate salt and key/IV
+    $saltBytes = New-Object Byte[] 8
+    (New-Object System.Security.Cryptography.RNGCryptoServiceProvider).GetBytes($saltBytes)
+    $pbkdf2 = New-Object System.Security.Cryptography.Rfc2898DeriveBytes($Password, $saltBytes, 10000, [System.Security.Cryptography.HashAlgorithmName]::SHA256)
+    $keyBytes = $pbkdf2.GetBytes($KeySize / 8)
+    $ivBytes = $pbkdf2.GetBytes(16)
+
+    # Set up AES encryption
     $aes = [System.Security.Cryptography.Aes]::Create()
-    $aes.KeySize = $KeySize
-    $aes.Key = $rfc2898.GetBytes($aes.KeySize / 8)
-    $aes.IV = $rfc2898.GetBytes($aes.BlockSize / 8)
+    $aes.KeySize = 256
+    $aes.BlockSize = 128
+    $aes.Mode = 'CBC'
+    $aes.Padding = 'PKCS7'
+    $aes.Key = $keyBytes
+    $aes.IV = $ivBytes
 
-    # Write salt to the beginning of the output file
-    $outStream.Write($salt, 0, $salt.Length)
+    # Write salt and encrypt
+    $saltPrefix = [System.Text.Encoding]::UTF8.GetBytes('Salted__') + $saltBytes
+    $outStream.Write($saltPrefix, 0, $saltPrefix.Length)
+    $encryptor = $aes.CreateEncryptor()
+    $cryptoStream = New-Object System.Security.Cryptography.CryptoStream($outStream, $encryptor, [System.Security.Cryptography.CryptoStreamMode]::Write)
 
-    # Encrypt and write the data to the output file
-    $cryptoStream = New-Object System.Security.Cryptography.CryptoStream($outStream, $aes.CreateEncryptor(), [System.Security.Cryptography.CryptoStreamMode]::Write)
-    $buffer = New-Object byte[] (1MB)
-    while (($bytesRead = $inStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+    # Encrypt in chunks
+    $bufferSize = 1MB
+    $buffer = New-Object byte[] $bufferSize
+    while (($bytesRead = $inStream.Read($buffer, 0, $bufferSize)) -gt 0) {
         $cryptoStream.Write($buffer, 0, $bytesRead)
     }
+    $cryptoStream.FlushFinalBlock()
+    $cryptoStream.Dispose()
+    $aes.Dispose()
 
-    # Cleanup
-    $cryptoStream.Close()
-    $inStream.Close()
-    $outStream.Close()
-    Write-Host "File encrypted successfully: $OutFile"
+    Write-Host "Encryption completed. Encrypted file: $OutFile"
+    Write-Host "Hash saved to: $HashFile"
 }
 
 ################################################################################
@@ -260,82 +261,107 @@ function Decrypt-File {
         [string]$HashFile
     )
 
-    # Ensure the output directory exists
-    $outDir = [System.IO.Path]::GetDirectoryName($OutFile)
-    if (-not (Test-Path $outDir)) {
-        New-Item -Path $outDir -ItemType Directory | Out-Null
-    }
-
     # Overwrite protection for OutFile
     if (-not (Confirm-Overwrite -Path $OutFile)) {
         return
     }
 
-    # Open file streams
     $inStream = [System.IO.File]::OpenRead($InFile)
     $outStream = New-Object System.IO.FileStream($OutFile, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write)
 
-    # Read the salt from the input file
-    $salt = New-Object byte[] 32
-    $inStream.Read($salt, 0, $salt.Length) | Out-Null
+    # Read salt (skip 'Salted__')
+    $saltBytes = New-Object Byte[] 8
+    $inStream.Position = 8
+    $null = $inStream.Read($saltBytes, 0, $saltBytes.Length)
 
-    # Derive the encryption key and IV using password and salt
-    $rfc2898 = New-Object System.Security.Cryptography.Rfc2898DeriveBytes($Password, $salt, 10000)
+    # Derive key and IV using PBKDF2
+    $pbkdf2 = New-Object System.Security.Cryptography.Rfc2898DeriveBytes($Password, $saltBytes, 10000, [System.Security.Cryptography.HashAlgorithmName]::SHA256)
+    $keyBytes = $pbkdf2.GetBytes(32)  # AES-256
+    $ivBytes = $pbkdf2.GetBytes(16)
+
+    # Set up AES decryption
     $aes = [System.Security.Cryptography.Aes]::Create()
-    $aes.Key = $rfc2898.GetBytes($aes.KeySize / 8)
-    $aes.IV = $rfc2898.GetBytes($aes.BlockSize / 8)
+    $aes.KeySize = 256
+    $aes.BlockSize = 128
+    $aes.Mode = 'CBC'
+    $aes.Padding = 'PKCS7'
+    $aes.Key = $keyBytes
+    $aes.IV = $ivBytes
 
-    # Decrypt and write the data to the output file
-    $cryptoStream = New-Object System.Security.Cryptography.CryptoStream($inStream, $aes.CreateDecryptor(), [System.Security.Cryptography.CryptoStreamMode]::Read)
-    $buffer = New-Object byte[] (1MB)
-    while (($bytesRead = $cryptoStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+    # Decrypt in chunks
+    $decryptor = $aes.CreateDecryptor()
+    $cryptoStream = New-Object System.Security.Cryptography.CryptoStream($inStream, $decryptor, [System.Security.Cryptography.CryptoStreamMode]::Read)
+    $bufferSize = 1MB
+    $buffer = New-Object byte[] $bufferSize
+    $bytesRead = 0
+
+    while (($bytesRead = $cryptoStream.Read($buffer, 0, $bufferSize)) -gt 0) {
         $outStream.Write($buffer, 0, $bytesRead)
     }
 
-    # Cleanup
     $cryptoStream.Close()
-    $outStream.Close()
-    $inStream.Close()
+    $aes.Dispose()
 
-    # Check file integrity using the hash
-    $decryptedStream = [System.IO.File]::OpenRead($OutFile)
-    $decryptedHash = Get-Hash -Stream $decryptedStream
-    $decryptedHashString = -join ($decryptedHash | ForEach-Object { $_.ToString('x2') })
-    $decryptedStream.Close()
+    Write-Host "Decryption completed. Decrypted file: $OutFile"
 
+    # Hash validation: Ensure the HashFile is saved in the OutFile directory
     if (-not $HashFile) {
-        $HashFile = Get-DefaultHashFilePath -InFile $InFile -OutFile $OutFile
+        $originalInFile = [System.IO.Path]::ChangeExtension($InFile, $null)  # Strip the .aes extension
+        $HashFile = Get-DefaultHashFilePath -InFile $originalInFile -OutFile $OutFile
     }
+    
+    # If the hash file is not found, prompt the user for an alternative path
     if (-not (Test-Path $HashFile)) {
-        Write-Host "Warning: No hash file found. Integrity check skipped."
-        $HashFile = Read-Host "Please provide an alternate path to the hash file for integrity validation, or press [ENTER] to skip"
-        if (-not $HashFile) {
-            Write-Warning "Integrity validation skipped."
+        Write-Warning "Hash file not found: $HashFile."
+        $alternativeHashFile = Read-Host "Please provide the correct path to the hash file or press Enter to cancel"
+        if ([string]::IsNullOrEmpty($alternativeHashFile)) {
+            Write-Warning "No hash file provided. Integrity check failed. Exiting..."
             return
+        } else {
+            $HashFile = $alternativeHashFile
+            if (-not (Test-Path $HashFile)) {
+                Write-Warning "The provided hash file does not exist. Exiting..."
+                return
+            }
         }
     }
 
-    $savedHash = Get-Content -Path $HashFile
-    if ($decryptedHashString -eq $savedHash) {
-        Write-Host "File integrity verified successfully (SHA-256 hash matches)."
-    }
-    else {
-        Write-Warning "File integrity check failed. The decrypted file may be corrupted or tampered with."
+    # Reopen the output file for hash verification
+    $outStream.Close()
+    $outStream = [System.IO.File]::OpenRead($OutFile)
+
+    # Verify hash
+    $computedHashBytes = (Get-Hash -Stream $outStream)
+    $computedHash = -join ($computedHashBytes | ForEach-Object { $_.ToString("x2") })
+    $storedHash = [System.IO.File]::ReadAllText($HashFile).Trim()
+
+    if ($computedHash -eq $storedHash) {
+        Write-Host "HASH VERIFICATION SUCCESSFUL. File integrity verified." -ForegroundColor Green
+    } else {
+        Write-Host "HASH VERIFICATION FAILED. File integrity check failed." -ForegroundColor Red
+        Write-Host "Expected Hash (Stored): $storedHash" -ForegroundColor Yellow
+        Write-Host "Computed Hash (Found):  $computedHash" -ForegroundColor Yellow
     }
 
-    Write-Host "File decrypted successfully: $OutFile"
+    $outStream.Close()
 }
 
 ################################################################################
-# Main Script Logic
+# Execution Path
 ################################################################################
 
-if ($Mode -eq 'Encrypt') {
-    Encrypt-File -InFile $InFile -OutFile $OutFile -Password $Password -KeySize $KeySize -HashFile $HashFile
+try {
+    if ($Mode -eq 'Encrypt') {
+        Encrypt-File -InFile $InFile -OutFile $OutFile -Password $Password -KeySize $KeySize -HashFile $HashFile
+    } elseif ($Mode -eq 'Decrypt') {
+        Decrypt-File -InFile $InFile -OutFile $OutFile -Password $Password -HashFile $HashFile
+    }
 }
-elseif ($Mode -eq 'Decrypt') {
-    Decrypt-File -InFile $InFile -OutFile $OutFile -Password $Password -HashFile $HashFile
-}
-else {
-    throw "Invalid Mode: $Mode. Acceptable values are 'Encrypt' or 'Decrypt'."
+
+finally {
+    # Dispose of resources only if they were initialized
+    if ($cryptoStream -ne $null) { $cryptoStream.Dispose() }
+    if ($inStream -ne $null) { $inStream.Dispose() }
+    if ($outStream -ne $null) { $outStream.Dispose() }
+    if ($aes -ne $null) { $aes.Dispose() }
 }
