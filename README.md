@@ -6,7 +6,7 @@ Here is a **README** for the script:
 
 ## Overview
 
-The ***File Cryptor** is a PowerShell script designed to securely encrypt and decrypt files using the Advanced Encryption Standard (AES). It leverages password-based encryption instead of key files, making it simpler to manage. The script supports large files, ensures file integrity through hashing, and offers customizable file paths.
+The **File Cryptor** is a PowerShell script designed to securely encrypt and decrypt files using the Advanced Encryption Standard (AES). It leverages password-based encryption instead of key files, making it simpler to manage. The script supports large files, ensures file integrity through hashing, and offers customizable file paths.
 
 ## Features
 
