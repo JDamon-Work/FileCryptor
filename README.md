@@ -12,6 +12,7 @@ The **File Cryptor** is a PowerShell script designed to securely encrypt and dec
 - **Large File Support**: Efficiently handles large files by processing them in chunks, avoiding memory issues.
 - **Customizable Output**: Flexible file naming with dynamic options like including the system hostname in file names.
 - **Error Handling & Resource Management**: The script properly handles errors and ensures resources like file streams and cryptographic objects are disposed of correctly.
+- **Overwrite Protection**: Prompts the user before overwriting existing files to prevent accidental data loss.
 
 ## Requirements
 
@@ -81,12 +82,3 @@ Decryption:
 | `-OutFile` | Path where the encrypted or decrypted file will be saved.                                                    |
 | `-Password`| The password used for both encryption and decryption.                                                        |                        
 | `-HashFile`| (Optional) Path to save or verify the SHA-256 hash for file integrity.                                        |
-
-## Features
-
-1. **AES Encryption**: Uses the industry-standard AES encryption algorithm.
-2. **Password-Based Key Derivation**: Securely derives encryption keys from passwords using PBKDF2.
-3. **File Integrity**: Ensures that decrypted files match the original by comparing SHA-256 hashes.
-4. **Customizable File Naming**: Allows dynamic output file names with placeholders like `[hn]` for the hostname.
-5. **Supports Large Files**: Processes files in chunks, making it suitable for encrypting or decrypting large files without memory issues.
-6. **Overwrite Protection**: Prompts the user before overwriting existing files to prevent accidental data loss.
