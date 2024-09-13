@@ -41,7 +41,7 @@ The script offers two modes of operation: **Encryption** and **Decryption**. It 
 To encrypt a file:
 
 ```powershell
-.\FileCryptor.ps1 -Mode Encrypt -InFile "C:\path\to\inputfile.txt" -OutFile "C:\path\to\encryptedfile.enc" -Password "YourStrongPassword" -HashFile "C:\path\to\file.hash"
+.\FileCryptor.ps1 -Mode Encrypt -InFile "C:\path\to\inputfile.txt" -OutFile "C:\path\to\encryptedfile.txt.enc" -Password "YourStrongPassword" -HashFile "C:\path\to\file.hash"
 ```
 
 - `-Mode Encrypt`: Specifies that the script should encrypt the file.
@@ -55,7 +55,7 @@ To encrypt a file:
 To decrypt a file:
 
 ```powershell
-.\FileCryptor.ps1 -Mode Decrypt -InFile "C:\path\to\encryptedfile.enc" -OutFile "C:\path\to\decryptedfile.txt" -Password "YourStrongPassword" -HashFile "C:\path\to\file.hash"
+.\FileCryptor.ps1 -Mode Decrypt -InFile "C:\path\to\encryptedfile.txt.enc" -OutFile "C:\path\to\decryptedfile.txt" -Password "YourStrongPassword" -HashFile "C:\path\to\file.hash"
 ```
 
 - `-Mode Decrypt`: Specifies that the script should decrypt the file.
