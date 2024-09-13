@@ -1,7 +1,3 @@
-Here is a **README** for the script:
-
----
-
 # File Cryptor Script
 
 ## Overview
